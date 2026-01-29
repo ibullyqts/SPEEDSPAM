@@ -3,7 +3,6 @@ import time
 import random
 import datetime
 import shutil
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,57 +11,41 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- CONFIGURATION ---
+# --- PHOENIX TURBO CONFIG (SPEED BOOSTED) ---
 THREADS = 2           
-BURST_SIZE = 8        
-CYCLE_DELAY = 1.0     
-LIFE_DURATION = 300   # 5 Minutes
+BURST_SIZE = 10       # [INCREASED] From 8 to 10 messages per burst
+BURST_DELAY = 0.03    # [FASTER] From 0.05s to 0.03s (30ms)
+CYCLE_DELAY = 0.8     # [FASTER] From 1.0s to 0.8s
+
+# ♻️ THE 5-MINUTE RULE
+LIFE_DURATION = 300   # 300 Seconds = 5 Minutes exactly
 LOG_FILE = "message_log.txt"
 
-# GLOBAL COUNTER
-GLOBAL_SENT = 0
-COUNTER_LOCK = threading.Lock()
+def log_status(agent_id, msg):
+    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] 🤖 Agent {agent_id}: {msg}", flush=True)
 
-def log_speed(agent_id, current_life_sent, start_time):
+def log_speed(agent_id, count, start_time):
     elapsed = time.time() - start_time
     if elapsed == 0: elapsed = 1
-    speed = current_life_sent / elapsed
+    speed = count / elapsed
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    
-    with COUNTER_LOCK:
-        total = GLOBAL_SENT
-        
-    entry = f"[{timestamp}] ⚡ Agent {agent_id} | Session Total: {total} | Speed: {speed:.1f} msg/s"
+    entry = f"[{timestamp}] ⚡ Agent {agent_id} | Total: {count} | Speed: {speed:.1f} msg/s"
     print(entry, flush=True)
     try:
         with open(LOG_FILE, "a") as f: f.write(entry + "\n")
     except: pass
 
 def get_driver(agent_id):
-    """Creates a lightweight browser for low-resource environments"""
     chrome_options = Options()
-    
-    # --- 🛡️ V19.0 LOW-RESOURCE FLAGS 🛡️ ---
-    # We use the standard '--headless' (not new) for maximum stability
-    chrome_options.add_argument("--headless") 
-    
-    # Critical Docker Flags
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-software-rasterizer") 
-    
-    # Memory Saving Flags
-    chrome_options.add_argument("--no-zygote")           # Disables extra process spawning
-    chrome_options.add_argument("--single-process")      # Forces all Chrome tasks into one process
-    chrome_options.add_argument("--disable-extensions")
-    
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-    
-    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,999999)}")
-    chrome_options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/12{agent_id+5}.0.0.0 Safari/537.36")
-    
+    # Forces a unique temp profile for every single restart
+    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,99999)}")
+    chrome_options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/12{agent_id+8}.0.0.0 Safari/537.36")
     return webdriver.Chrome(options=chrome_options)
 
 def instant_inject(driver, element, text):
@@ -79,28 +62,22 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
     start_time = time.time()
     
     try:
-        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ♻️ Agent {agent_id}: Rebirthing Browser...", flush=True)
+        log_status(agent_id, "🔥 Refreshing Browser Engine...")
         driver = get_driver(agent_id)
         
-        # 1. Login
         driver.get("https://www.instagram.com/")
         clean_session = session_id.split("sessionid=")[1].split(";")[0] if "sessionid=" in session_id else session_id
         driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'domain': '.instagram.com', 'path': '/'})
         driver.refresh()
         time.sleep(5)
 
-        # 2. Target
         driver.get(f"https://www.instagram.com/direct/t/{target_input}/")
         time.sleep(5)
         
         box_xpath = "//div[@contenteditable='true']"
-        try:
-            msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
-        except:
-            print(f"⚠️ Agent {agent_id}: Failed to load. Retrying...", flush=True)
-            return
+        msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
 
-        # 3. Loop
+        # 5-MINUTE TIMER LOOP
         while (time.time() - start_time) < LIFE_DURATION:
             try:
                 for _ in range(BURST_SIZE):
@@ -108,38 +85,34 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
                     jitter = "⠀" * random.randint(0, 1)
                     instant_inject(driver, msg_box, f"{msg}{jitter}")
                     msg_box.send_keys(Keys.ENTER)
-                    
                     sent_in_this_life += 1
-                    with COUNTER_LOCK:
-                        global GLOBAL_SENT
-                        GLOBAL_SENT += 1
-                        
-                    time.sleep(random.uniform(0.15, 0.20))
+                    time.sleep(BURST_DELAY)
                 
                 log_speed(agent_id, sent_in_this_life, start_time)
                 time.sleep(CYCLE_DELAY)
 
             except Exception:
-                break 
-        
-        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⏰ Agent {agent_id}: 5 Minutes Up. Refreshing...", flush=True)
+                break # Restart on any minor error
                 
     except Exception as e:
-        print(f"⚠️ Agent {agent_id} Error: {e}", flush=True)
+        log_status(agent_id, f"Life Cycle Error: {e}")
     finally:
         if driver:
-            try: driver.quit()
+            try: 
+                driver.quit()
+                log_status(agent_id, f"Successfully retired. Sent: {sent_in_this_life}")
             except: pass
+        # Clean up temp folder immediately
         try: shutil.rmtree(f"/tmp/chrome_p_{agent_id}", ignore_errors=True)
         except: pass
 
 def agent_worker(agent_id, session_id, target_input, messages):
     while True:
         run_life_cycle(agent_id, session_id, target_input, messages)
-        time.sleep(3)
+        time.sleep(2) # 2s breather before rebirth
 
 def main():
-    print(f"🔥 V19.0 COMPATIBILITY MODE | {THREADS} THREADS", flush=True)
+    print(f"🚀 V18.3 PHOENIX TURBO | 5-MIN REBIRTH | {THREADS} AGENTS", flush=True)
     
     session_id = os.environ.get("INSTA_SESSION", "").strip()
     target_input = os.environ.get("TARGET_THREAD_ID", "").strip()
