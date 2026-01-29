@@ -39,26 +39,28 @@ def log_speed(agent_id, current_life_sent, start_time):
     except: pass
 
 def get_driver(agent_id):
+    """Creates a lightweight browser for low-resource environments"""
     chrome_options = Options()
     
-    # --- 🛡️ V18.8 RENDERER FIX 🛡️ ---
-    chrome_options.add_argument("--headless=new") 
+    # --- 🛡️ V19.0 LOW-RESOURCE FLAGS 🛡️ ---
+    # We use the standard '--headless' (not new) for maximum stability
+    chrome_options.add_argument("--headless") 
+    
+    # Critical Docker Flags
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-software-rasterizer") 
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-infobars")
     
-    # 🚨 CRITICAL CHANGE: Removed '--remote-debugging-port'
-    # This lets Selenium assign unique ports to avoid Agent 1 vs Agent 2 conflict
+    # Memory Saving Flags
+    chrome_options.add_argument("--no-zygote")           # Disables extra process spawning
+    chrome_options.add_argument("--single-process")      # Forces all Chrome tasks into one process
+    chrome_options.add_argument("--disable-extensions")
     
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--blink-settings=imagesEnabled=false")
     
-    # Unique Temp Directory per Agent
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,999999)}")
-    
     chrome_options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/12{agent_id+5}.0.0.0 Safari/537.36")
     
     return webdriver.Chrome(options=chrome_options)
@@ -95,7 +97,7 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
         try:
             msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
         except:
-            print(f"⚠️ Agent {agent_id}: Page load failed. Retrying...", flush=True)
+            print(f"⚠️ Agent {agent_id}: Failed to load. Retrying...", flush=True)
             return
 
         # 3. Loop
@@ -137,7 +139,7 @@ def agent_worker(agent_id, session_id, target_input, messages):
         time.sleep(3)
 
 def main():
-    print(f"🔥 V18.8 AUTO-PORT FIX | {THREADS} THREADS", flush=True)
+    print(f"🔥 V19.0 COMPATIBILITY MODE | {THREADS} THREADS", flush=True)
     
     session_id = os.environ.get("INSTA_SESSION", "").strip()
     target_input = os.environ.get("TARGET_THREAD_ID", "").strip()
