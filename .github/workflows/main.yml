@@ -1,9 +1,8 @@
-name: V18.4 Phoenix Relay
+name: V18.7 Phoenix Relay
 
 on:
   workflow_dispatch:
   schedule:
-    # Runs at minute 55 of hours 5, 11, 17, 23
     - cron: '55 5,11,17,23 * * *'
 
 jobs:
@@ -23,11 +22,11 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install selenium webdriver-manager
+          pip install selenium 
 
-      - name: Run V18.4 Phoenix
+      - name: Run V18.7 Phoenix
         env:
-          PYTHONUNBUFFERED: 1  # ⚡ Real-Time Logs
+          PYTHONUNBUFFERED: 1 
           INSTA_SESSION: ${{ secrets.INSTA_SESSION }}
           TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
           MESSAGES: ${{ secrets.MESSAGES }}
