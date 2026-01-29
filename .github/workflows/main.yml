@@ -1,12 +1,13 @@
-name: V17.6 Real-Time Turbo
+name: V18.4 Phoenix Relay
 
 on:
   workflow_dispatch:
   schedule:
+    # Runs at minute 55 of hours 5, 11, 17, 23
     - cron: '55 5,11,17,23 * * *'
 
 jobs:
-  launch-realtime:
+  launch-phoenix:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -24,10 +25,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install selenium webdriver-manager
 
-      - name: Run V17.6 Real-Time
+      - name: Run V18.4 Phoenix
         env:
-          # ⚡ THIS IS THE KEY TO REAL-TIME LOGS
-          PYTHONUNBUFFERED: 1 
+          PYTHONUNBUFFERED: 1  # ⚡ Real-Time Logs
           INSTA_SESSION: ${{ secrets.INSTA_SESSION }}
           TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
           MESSAGES: ${{ secrets.MESSAGES }}
@@ -37,5 +37,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: realtime-logs
+          name: phoenix-logs
           path: message_log.txt
