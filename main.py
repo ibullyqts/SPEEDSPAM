@@ -41,23 +41,25 @@ def log_speed(agent_id, current_life_sent, start_time):
     except: pass
 
 def get_driver(agent_id):
-    """Creates a fresh browser with robust crash protection"""
+    """Creates a browser optimized for Linux Containers"""
     chrome_options = Options()
     
-    # 🛡️ STABILITY FLAGS (Fixes the 0x55 crash)
-    chrome_options.add_argument("--headless=new") # New stable headless mode
+    # --- 🛡️ V18.6 CONTAINER FLAGS 🛡️ ---
+    chrome_options.add_argument("--headless=new") 
     chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage") # Critical for memory
-    chrome_options.add_argument("--disable-gpu")           # Critical for Linux
-    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-software-rasterizer") # Fixes graphical crash
+    chrome_options.add_argument("--remote-debugging-port=9222")  # Fixes connection timeout
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-infobars")
     
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--blink-settings=imagesEnabled=false")
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,99999)}")
     chrome_options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/12{agent_id+5}.0.0.0 Safari/537.36")
     
-    # 🔧 FORCE DRIVER MATCHING
-    # This automatically downloads the correct driver for the server's Chrome
+    # Auto-Install Correct Driver
     service = Service(ChromeDriverManager().install())
     
     return webdriver.Chrome(service=service, options=chrome_options)
@@ -79,18 +81,25 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ♻️ Agent {agent_id}: Rebirthing Browser...", flush=True)
         driver = get_driver(agent_id)
         
+        # 1. Login
         driver.get("https://www.instagram.com/")
         clean_session = session_id.split("sessionid=")[1].split(";")[0] if "sessionid=" in session_id else session_id
         driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'domain': '.instagram.com', 'path': '/'})
         driver.refresh()
         time.sleep(5)
 
+        # 2. Target
         driver.get(f"https://www.instagram.com/direct/t/{target_input}/")
         time.sleep(5)
         
         box_xpath = "//div[@contenteditable='true']"
-        msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
+        try:
+            msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
+        except:
+            print(f"⚠️ Agent {agent_id}: Page crashed or blocked. Restarting...", flush=True)
+            return # Exit function to trigger restart
 
+        # 3. Loop
         while (time.time() - start_time) < LIFE_DURATION:
             try:
                 for _ in range(BURST_SIZE):
@@ -115,7 +124,7 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⏰ Agent {agent_id}: 5 Minutes Up. Refreshing...", flush=True)
                 
     except Exception as e:
-        print(f"⚠️ Agent {agent_id} Error: {e}", flush=True)
+        print(f"⚠️ Agent {agent_id} Crash: {e}", flush=True)
     finally:
         if driver:
             try: driver.quit()
@@ -129,7 +138,7 @@ def agent_worker(agent_id, session_id, target_input, messages):
         time.sleep(2)
 
 def main():
-    print(f"🔥 V18.5 STABLE PATCH | {THREADS} THREADS", flush=True)
+    print(f"🔥 V18.6 ANTI-CRASH CONTAINER | {THREADS} THREADS", flush=True)
     
     session_id = os.environ.get("INSTA_SESSION", "").strip()
     target_input = os.environ.get("TARGET_THREAD_ID", "").strip()
