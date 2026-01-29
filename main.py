@@ -41,18 +41,24 @@ def log_speed(agent_id, current_life_sent, start_time):
 def get_driver(agent_id):
     chrome_options = Options()
     
-    # --- 🛡️ V18.7 FLAGS 🛡️ ---
+    # --- 🛡️ V18.8 RENDERER FIX 🛡️ ---
     chrome_options.add_argument("--headless=new") 
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-software-rasterizer") 
-    chrome_options.add_argument("--remote-debugging-port=9222")
     chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-infobars")
+    
+    # 🚨 CRITICAL CHANGE: Removed '--remote-debugging-port'
+    # This lets Selenium assign unique ports to avoid Agent 1 vs Agent 2 conflict
     
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,99999)}")
+    
+    # Unique Temp Directory per Agent
+    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,999999)}")
+    
     chrome_options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/12{agent_id+5}.0.0.0 Safari/537.36")
     
     return webdriver.Chrome(options=chrome_options)
@@ -89,7 +95,7 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
         try:
             msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
         except:
-            print(f"⚠️ Agent {agent_id}: Page crashed or blocked. Restarting...", flush=True)
+            print(f"⚠️ Agent {agent_id}: Page load failed. Retrying...", flush=True)
             return
 
         # 3. Loop
@@ -128,10 +134,10 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
 def agent_worker(agent_id, session_id, target_input, messages):
     while True:
         run_life_cycle(agent_id, session_id, target_input, messages)
-        time.sleep(2)
+        time.sleep(3)
 
 def main():
-    print(f"🔥 V18.7 NATIVE DRIVER | {THREADS} THREADS", flush=True)
+    print(f"🔥 V18.8 AUTO-PORT FIX | {THREADS} THREADS", flush=True)
     
     session_id = os.environ.get("INSTA_SESSION", "").strip()
     target_input = os.environ.get("TARGET_THREAD_ID", "").strip()
